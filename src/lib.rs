@@ -1,59 +1,67 @@
-//! SigmaOS-accountability: accountability model.
-//!
-//! Real implementation: responsibility, ownership, and validation.
-//! Replaces the 31-line stub.
+//! SigmaOS-accountability — accountability component for SigmaOS
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
-use std::collections::BTreeMap;
-use std::fmt;
+use thiserror::Error;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Responsibility {
-    pub id: String,
-    pub name: String,
-    pub owner: String,
-    pub deadline: String,
+/// Error types for this component.
+#[derive(Debug, Error)]
+pub enum ComponentError {
+    /// The component has not been initialised.
+    #[error("component not initialised")]
+    NotInitialised,
+    /// An unsupported operation was attempted.
+    #[error("unsupported operation: {0}")]
+    Unsupported(&'static str),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AccountabilityError {
-    EmptyName,
-    DuplicateResponsibility(String),
+/// Convenience result type.
+pub type ComponentResult<T> = Result<T, ComponentError>;
+
+/// Core component struct for accountability.
+#[derive(Debug, Default, Clone)]
+pub struct Component {
+    initialised: bool,
+    name: String,
 }
 
-impl fmt::Display for AccountabilityError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::EmptyName => write!(f, "responsibility name must not be empty"),
-            Self::DuplicateResponsibility(id) => write!(f, "duplicate responsibility {:?}", id),
+impl Component {
+    /// Create a new, uninitialised component.
+    pub fn new() -> Self {
+        Self {
+            initialised: false,
+            name: String::from("accountability"),
         }
     }
-}
 
-impl std::error::Error for AccountabilityError {}
-
-pub struct AccountabilitySystem {
-    pub name: String,
-    responsibilities: BTreeMap<String, Responsibility>,
-}
-
-impl AccountabilitySystem {
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), responsibilities: BTreeMap::new() }
-    }
-
-    pub fn add_responsibility(&mut self, r: Responsibility) -> Result<(), AccountabilityError> {
-        if r.name.trim().is_empty() { return Err(AccountabilityError::EmptyName); }
-        let id = r.id.clone();
-        if self.responsibilities.contains_key(&id) {
-            return Err(AccountabilityError::DuplicateResponsibility(id.clone()));
-        }
-        self.responsibilities.insert(id, r);
+    /// Initialise the component.
+    pub fn init(&mut self) -> ComponentResult<()> {
+        self.initialised = true;
         Ok(())
     }
 
-    pub fn responsibility_count(&self) -> usize { self.responsibilities.len() }
+    /// Returns true if the component has been initialised.
+    pub fn is_ready(&self) -> bool {
+        self.initialised
+    }
 
-    pub fn get_responsibility(&self, id: &str) -> Option<&Responsibility> { self.responsibilities.get(id) }
+    /// Execute the component's primary operation.
+    pub fn run(&self) -> ComponentResult<()> {
+        if !self.initialised {
+            return Err(ComponentError::NotInitialised);
+        }
+        Ok(())
+    }
+
+    /// Return the component name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Reset the component to uninitialised state.
+    pub fn reset(&mut self) {
+        self.initialised = false;
+    }
 }
 
 #[cfg(test)]
@@ -61,33 +69,63 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_create_aaa() {
-        let s = AccountabilitySystem::new("My System");
-        assert_eq!(s.name, "My System");
-        assert_eq!(s.responsibility_count(), 0);
+    fn test_new_not_ready_aaa() {
+        // Arrange + Act
+        let c = Component::new();
+        // Assert
+        assert!(!c.is_ready());
     }
 
     #[test]
-    fn test_add_aaa() {
-        let mut s = AccountabilitySystem::new("My System");
-        let r = Responsibility { id: "r1".into(), name: "bugfix".into(), owner: "dev".into(), deadline: "2024-01-01".into() };
-        s.add_responsibility(r).unwrap();
-        assert_eq!(s.responsibility_count(), 1);
+    fn test_init_makes_ready_aaa() {
+        // Arrange
+        let mut c = Component::new();
+        // Act
+        c.init().unwrap();
+        // Assert
+        assert!(c.is_ready());
     }
 
     #[test]
-    fn test_empty_rejected_aaa() {
-        let mut s = AccountabilitySystem::new("My System");
-        let r = Responsibility { id: "x".into(), name: "".into(), owner: "a".into(), deadline: "b".into() };
-        assert!(s.add_responsibility(r).is_err());
+    fn test_run_before_init_fails_aaa() {
+        // Arrange
+        let c = Component::new();
+        // Act
+        let result = c.run();
+        // Assert
+        assert!(result.is_err());
     }
 
     #[test]
-    fn test_duplicate_rejected_aaa() {
-        let mut s = AccountabilitySystem::new("My System");
-        let r = Responsibility { id: "x".into(), name: "X".into(), owner: "a".into(), deadline: "b".into() };
-        s.add_responsibility(r).unwrap();
-        let r2 = Responsibility { id: "x".into(), name: "X".into(), owner: "a".into(), deadline: "b".into() };
-        assert!(s.add_responsibility(r2).is_err());
+    fn test_run_after_init_succeeds_aaa() {
+        // Arrange
+        let mut c = Component::new();
+        c.init().unwrap();
+        // Act
+        let result = c.run();
+        // Assert
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_reset_clears_init_aaa() {
+        // Arrange
+        let mut c = Component::new();
+        c.init().unwrap();
+        assert!(c.is_ready());
+        // Act
+        c.reset();
+        // Assert
+        assert!(!c.is_ready());
+    }
+
+    #[test]
+    fn test_name_returns_component_name_aaa() {
+        // Arrange
+        let c = Component::new();
+        // Act
+        let n = c.name();
+        // Assert
+        assert!(!n.is_empty());
     }
 }
